@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Design Thinking Bootleg</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h3>Modules</h3>
+    <div class="nav" id="sidebar-stages"></div>
+  </aside>
+  <main>
+    <!-- Section for Stage Details -->
+    <section class="stage" id="stage-detail-section" style="display:none;">
+      <div class="back-btn" id="back-to-overview">← Back</div>
+      <h1 id="stage-title">Loading...</h1>
+      <p id="stage-description">Please wait while we load stage details.</p>
+
+      <h2>Methods in this Stage</h2>
+      <div class="cards" id="methods-container"></div>
+    </section>
+
+    <!-- Section for Stages Overview -->
+    <section class="stage" id="stages-overview-section" style="display:none;">
+      <h2>Stages Overview</h2>
+      <section class="hero">
+        <h1 class="hero-title">Welcome!!!</h1>
+        <p>In your hands you hold a Design Thinking Booklet, a set of tools and methods that we keep in our back pockets, and now you can do the same.</p>
+        <p>These cards were developed by teaching team members, students, as well as designers from around the world. It’s a deck of cards, so you can start wherever you want. We think of these cards as a set of tools/methods that constantly evolves.</p>
+        <h3 class="hero-sub">Process modules</h3>
+        <p>The diagram below shows five “modes” that we identify as the components of design thinking. Each card in this deck stems from one (or more) of these modes, and will be color coded at the bottom of each card, in the lower right corner.</p>
+
+        <div class="chips">
+          <div class="chip" style="--chip:#06b6d4">EMPATHIZE</div>
+          <div class="chip" style="--chip:#10b981">DEFINE</div>
+          <div class="chip" style="--chip:#f59e0b">IDEATE</div>
+          <div class="chip" style="--chip:#ef4444">PROTOTYPE</div>
+          <div class="chip" style="--chip:#7f1d1d">TEST</div>
+        </div>
+        <div class="hero-legend" aria-hidden="true">
+          <span class="swatch" style="--c:#06b6d4"></span>
+          <span class="swatch" style="--c:#10b981"></span>
+          <span class="swatch" style="--c:#f59e0b"></span>
+          <span class="swatch" style="--c:#ef4444"></span>
+          <span class="swatch" style="--c:#7f1d1d"></span>
+        </div>
+        <div class="hero-credit">d.school at Stanford University</div>
+      </section>
+      <div class="cards" id="stages-container"></div>
+    </section>
+    <!-- Modal for Method (Booklet) -->
+    <div class="modal" id="method-modal" aria-hidden="true">
+      <div class="booklet" id="booklet" role="dialog" aria-modal="true">
+        <div class="ribbon" id="booklet-ribbon"></div>
+        <div class="pages">
+          <div class="page">
+            <div class="meta" id="method-stage"></div>
+            <h2 id="method-title">Loading...</h2>
+            <p class="meta" id="method-short"></p>
+            <h3>How it works</h3>
+            <p id="method-long"></p>
+          </div>
+          <div class="divider"></div>
+          <div class="page">
+            <div id="method-sections"></div>
+          </div>
+        </div>
+        <div class="footer-row">
+          <div class="footer">d.school at Stanford University</div>
+          <div class="legend" aria-hidden="true">
+            <span class="swatch accent"></span>
+            <span class="swatch" style="--c:#cbd5e1"></span>
+            <span class="swatch" style="--c:#9ca3af"></span>
+            <span class="swatch" style="--c:#6b7280"></span>
+            <span class="swatch" style="--c:#4b5563"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+ </div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+const stageDetailSection = document.getElementById('stage-detail-section');
+const overviewSection = document.getElementById('stages-overview-section');
+const stagesContainer = document.getElementById('stages-container');
+const methodsContainer = document.getElementById('methods-container');
+const backBtn = document.getElementById('back-to-overview');
+const sidebarStages = document.getElementById('sidebar-stages');
+const modal = document.getElementById('method-modal');
+const bookletEl = document.getElementById('booklet');
+const bookletRibbon = document.getElementById('booklet-ribbon');
+const methodStageEl = document.getElementById('method-stage');
+const methodTitleEl = document.getElementById('method-title');
+const methodShortEl = document.getElementById('method-short');
+const methodLongEl = document.getElementById('method-long');
+const methodSectionsEl = document.getElementById('method-sections');
+
+// Stage color mapping (overrides DB colors)
+const STAGE_COLOR_MAP = {
+  'empathize': '#06b6d4', // cyan
+  'define': '#10b981',    // green
+  'ideate': '#f59e0b',    // yellow
+  'prototype': '#ef4444', // red
+  'test': '#7f1d1d'       // maroon brown
+};
+
+function getStageColorByName(name, fallback) {
+  if (!name) return fallback || '#3b82f6';
+  const key = String(name).toLowerCase();
+  return STAGE_COLOR_MAP[key] || fallback || '#3b82f6';
+}
+
+// Load all stages first
+axios.get('http://localhost/lorem%20ipsum/api/stages.php')
+  .then(res => {
+    const stages = res.data;
+    overviewSection.style.display = "block";
+
+    stages.forEach(stage => {
+      const stageColor = getStageColorByName(stage.name, stage.color_code);
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h4>${stage.name}</h4>
+        <p>${stage.description}</p>
+        <div class="tag" style="background:${stageColor}">${stage.name}</div>
+      `;
+
+      // Click to show stage details
+      card.onclick = () => {
+        overviewSection.style.display = "none";
+        stageDetailSection.style.display = "block";
+        loadStage(stage.stage_id);
+      };
+
+      stagesContainer.appendChild(card);
+
+      // Populate persistent sidebar (stable, does not re-render content)
+      const btn = document.createElement('button');
+      btn.textContent = stage.name;
+      btn.onclick = () => {
+        overviewSection.style.display = "none";
+        stageDetailSection.style.display = "block";
+        loadStage(stage.stage_id);
+        setActiveStageButton(btn, stageColor);
+      };
+      sidebarStages.appendChild(btn);
+    });
+  })
+  .catch(err => console.error(err));
+
+// Load stage details + methods dynamically
+function loadStage(stageId) {
+  // Stage details
+  axios.get('http://localhost/lorem%20ipsum/api/stages.php')
+    .then(res => {
+      const stages = res.data;
+      const stage = stages.find(s => s.stage_id == stageId);
+      if(stage) {
+        document.getElementById('stage-title').textContent = stage.name;
+        document.getElementById('stage-description').textContent = stage.description;
+        // Store current stage color for booklet ribbon and UI accents
+        const stageColor = getStageColorByName(stage.name, stage.color_code);
+        bookletRibbon.style.background = stageColor;
+        if (bookletEl) bookletEl.style.setProperty('--accent', stageColor);
+        document.documentElement.style.setProperty('--accent', stageColor);
+        methodStageEl.textContent = stage.name;
+      }
+    });
+
+  // Methods for this stage
+  axios.get('http://localhost/lorem%20ipsum/api/methods.php?id=' + stageId)
+    .then(res => {
+      const methods = res.data;
+      methodsContainer.innerHTML = "";
+
+      if(!methods || methods.length === 0) {
+        methodsContainer.innerHTML = "<p>No methods available for this stage yet.</p>";
+      } else {
+        methods.forEach(m => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <h4>${m.title}</h4>
+            <p>${m.short_desc || ''}</p>
+            <div class="tag" style="background:#3b82f6">Method</div>
+          `;
+          card.onclick = () => openMethodBooklet(m.method_id);
+          methodsContainer.appendChild(card);
+        });
+      }
+    })
+    .catch(err => console.error("Methods API error:", err));
+}
+
+// Back button
+backBtn.onclick = () => {
+  stageDetailSection.style.display = "none";
+  overviewSection.style.display = "block";
+};
+
+// Booklet modal logic
+function openMethodBooklet(methodId) {
+  // Load full method details
+  axios.get('http://localhost/lorem%20ipsum/api/get_method.php?method_id=' + methodId)
+    .then(res => {
+      const m = res.data;
+      methodTitleEl.textContent = m.title || 'Untitled Method';
+      methodShortEl.textContent = m.short_desc || '';
+      methodLongEl.textContent = m.long_desc || '';
+      // Load and render sections next
+      loadAndRenderSections(methodId);
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    })
+    .catch(() => {
+      methodTitleEl.textContent = 'Error loading method';
+      methodShortEl.textContent = '';
+      methodLongEl.textContent = '';
+      modal.classList.add('open');
+    });
+}
+
+function closeModal() {
+  modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) closeModal();
+});
+
+// Sidebar active helper
+function setActiveStageButton(activeBtn, color) {
+  Array.from(sidebarStages.querySelectorAll('button')).forEach(b => {
+    b.classList.remove('active');
+    b.style.setProperty('--active-color', '');
+  });
+  activeBtn.classList.add('active');
+  if (color) activeBtn.style.setProperty('--active-color', color);
+}
+
+// Esc to close modal
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modal.classList.contains('open')) {
+    closeModal();
+  }
+});
+
+// Sections
+function loadAndRenderSections(methodId) {
+  methodSectionsEl.innerHTML = '';
+  axios.get('http://localhost/lorem%20ipsum/api/get_sections.php?method_id=' + methodId)
+    .then(res => {
+      const sections = Array.isArray(res.data) ? res.data : [];
+      if (sections.length === 0) {
+        methodSectionsEl.innerHTML = '<p class="meta">No sections available.</p>';
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      sections.forEach(s => fragment.appendChild(renderSectionNode(s)));
+      methodSectionsEl.appendChild(fragment);
+    })
+    .catch(() => {
+      methodSectionsEl.innerHTML = '<p class="meta">Error loading sections.</p>';
+    });
+}
+
+function renderSectionNode(node) {
+  const wrap = document.createElement('div');
+  wrap.className = 'section-item';
+  const title = document.createElement('div');
+  title.className = 'section-title';
+  title.textContent = node.title || 'Untitled section';
+  const desc = document.createElement('p');
+  desc.className = 'section-desc';
+  desc.textContent = node.description || '';
+  wrap.appendChild(title);
+  wrap.appendChild(desc);
+  if (node.children && node.children.length) {
+    const children = document.createElement('div');
+    children.className = 'section-children';
+    node.children.forEach(c => children.appendChild(renderSectionNode(c)));
+    wrap.appendChild(children);
+  }
+  return wrap;
+}
+</script>
+</body>
+</html>
