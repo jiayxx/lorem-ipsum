@@ -352,7 +352,7 @@ main {
     color: #6b7280 !important;
     flex-grow: 1 !important;
     display: -webkit-box !important;
-    -webkit-line-clamp: 3 !important;
+
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -1893,7 +1893,7 @@ h2 {
         font-size: 0.85rem;
         line-height: 1.5;
         color: #6b7280;
-        -webkit-line-clamp: unset !important;
+
         display: block !important;
     }
 
