@@ -5,7 +5,6 @@ include './db.php'; // adjust path if needed
 if (isset($_GET['id'])) {
     $stageId = intval($_GET['id']);
 
-    // ✅ Only fetch methods linked to this stage
     $sql = "
         SELECT m.method_id, m.title, m.short_desc, m.long_desc, m.resources
         FROM methods m
@@ -22,7 +21,6 @@ if (isset($_GET['id'])) {
     echo json_encode($methods);
 
 } else {
-    // ✅ Optional: fetch all methods if no stage is specified
     $sql = "SELECT * FROM methods";
     $result = $conn->query($sql);
 

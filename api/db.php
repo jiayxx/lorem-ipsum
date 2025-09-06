@@ -1,21 +1,37 @@
 <?php
+/* 
+==========================================
+DESIGN THINKING BOOKLET - DATABASE CONNECTION
+==========================================
+
+This file establishes the database connection for the Design Thinking Booklet system.
+It connects to MySQL database and creates the necessary tables if they don't exist.
+
+DATABASE STRUCTURE:
+- stages: Design thinking stages (Empathize, Define, Ideate, Prototype, Test)
+- methods: Individual methods within each stage
+- method_sections: Detailed sections for each method
+- method_stage: Links methods to stages
+- method_modes: Links methods to modes (same as stages)
+- modes: Mode definitions (same as stages)
+
+TEACHER NOTE: This is the database foundation for the entire booklet system.
+All content is stored in these tables and accessed via the API files.
+*/
+
 $servername = "localhost";
 $username = "root";   // default in XAMPP
 $password = "";       // default is empty in XAMPP
 $dbname = "dtlearningsystem"; // your database name
 
-// Create connection
 $conn = new mysqli($servername, $username, $password);
 
-// Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Check if database exists, if not create it
 $result = $conn->query("SHOW DATABASES LIKE '$dbname'");
 if ($result->num_rows == 0) {
-    // Database doesn't exist, create it
     if ($conn->query("CREATE DATABASE $dbname")) {
         echo "Database '$dbname' created successfully\n";
     } else {
@@ -23,11 +39,9 @@ if ($result->num_rows == 0) {
     }
 }
 
-// Select the database
 $conn->select_db($dbname);
 
-// Check if tables exist, if not create them
-$tables = ['stages', 'methods', 'method_sections', 'method_stage'];
+$tables = ['stages', 'methods', 'method_sections', 'method_stage', 'method_modes', 'modes'];
 foreach ($tables as $table) {
     $result = $conn->query("SHOW TABLES LIKE '$table'");
     if ($result->num_rows == 0) {
@@ -51,6 +65,7 @@ function createTable($conn, $tableName) {
             $sql = "CREATE TABLE methods (
                 method_id INT AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
+
                 short_desc TEXT,
                 long_desc TEXT,
                 resources TEXT,
@@ -80,6 +95,25 @@ function createTable($conn, $tableName) {
                 FOREIGN KEY (stage_id) REFERENCES stages(stage_id) ON DELETE CASCADE
             )";
             break;
+            
+        case 'method_modes':
+            $sql = "CREATE TABLE method_modes (
+                method_id INT NOT NULL,
+                mode_name VARCHAR(50) NOT NULL,
+                PRIMARY KEY (method_id, mode_name),
+                FOREIGN KEY (method_id) REFERENCES methods(method_id) ON DELETE CASCADE
+            )";
+            break;
+
+        case 'modes':
+            $sql = "CREATE TABLE modes (
+                mode_id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                color_code VARCHAR(7) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )";
+            break;
     }
     
     if ($conn->query($sql)) {
@@ -89,7 +123,6 @@ function createTable($conn, $tableName) {
     }
 }
 
-// Insert default stages if they don't exist
 $result = $conn->query("SELECT COUNT(*) as count FROM stages");
 $row = $result->fetch_assoc();
 if ($row['count'] == 0) {
@@ -109,5 +142,26 @@ if ($row['count'] == 0) {
         $conn->query($sql);
     }
     echo "Default stages inserted successfully\n";
+}
+
+$result = $conn->query("SELECT COUNT(*) as count FROM modes");
+$row = $result->fetch_assoc();
+if ($row['count'] == 0) {
+    $defaultModes = [
+        ['name' => 'EMPATHIZE', 'color_code' => '#06b6d4', 'description' => 'Understanding the user and their needs'],
+        ['name' => 'DEFINE', 'color_code' => '#10b981', 'description' => 'Defining the problem to be solved'],
+        ['name' => 'IDEATE', 'color_code' => '#f59e0b', 'description' => 'Generating creative solutions'],
+        ['name' => 'PROTOTYPE', 'color_code' => '#ef4444', 'description' => 'Creating tangible representations'],
+        ['name' => 'TEST', 'color_code' => '#8b5cf6', 'description' => 'Testing solutions with users']
+    ];
+    
+    foreach ($defaultModes as $mode) {
+        $name = $conn->real_escape_string($mode['name']);
+        $color = $conn->real_escape_string($mode['color_code']);
+        $desc = $conn->real_escape_string($mode['description']);
+        $sql = "INSERT INTO modes (name, color_code, description) VALUES ('$name', '$color', '$desc')";
+        $conn->query($sql);
+    }
+    echo "Default modes inserted successfully\n";
 }
 ?>

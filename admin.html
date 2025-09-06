@@ -1,3 +1,23 @@
+<!-- 
+==========================================
+DESIGN THINKING BOOKLET - ADMIN PANEL
+==========================================
+
+This is the administrative interface for managing the Design Thinking Booklet content.
+Teachers and administrators use this to create, edit, and organize the booklet content.
+
+KEY ADMIN FEATURES:
+- Stage Management: Create and edit design thinking stages (Empathize, Define, etc.)
+- Method Management: Add, edit, and organize methods within stages
+- Section Management: Create detailed sections for each method
+- Image Upload: Add images to methods for visual learning
+- Drag & Drop: Reorder methods within stages
+- Color Management: Set colors for each stage/mode
+- Undo Functionality: 24-hour undo for deleted stages
+
+TEACHER NOTE: This is the content management system for the booklet.
+All content created here appears in the main application (main.html).
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,453 +25,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin – DT Booklet</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .admin-grid { display:grid; grid-template-columns: 280px 1fr; min-height:100vh; }
-    .admin-sidebar { border-right:1px solid var(--border); padding:1rem; background:linear-gradient(180deg,#fff 0%, #f8fafc 100%); }
-    .admin-content { padding:1rem 1.25rem; background: radial-gradient(800px 300px at 80% 0%, rgba(6,182,212,.05), transparent 50%), #fff; }
-    .stack { display:flex; flex-direction:column; gap:.6rem; }
-    .row { display:flex; gap:.6rem; align-items:center; }
-    .list { border:1px solid var(--border); border-radius:12px; padding:.5rem; background:#fff; max-height:260px; overflow:auto; box-shadow:0 6px 14px rgba(0,0,0,.04); }
-    .list button { width:100%; text-align:left; padding:.55rem .65rem; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer; transition:background .15s ease; }
-    .list button:hover { background:#f3f4f6; }
-    .list button.selected { 
-      border-color: var(--selected-color, #3b82f6); 
-      box-shadow: inset 4px 0 0 var(--selected-color, #3b82f6), 0 2px 10px rgba(0, 0, 0, .05);
-      background: #f9fbff;
-    }
-    .panel { border:1px solid var(--border); border-radius:14px; background:#fff; padding:1rem; box-shadow:0 8px 22px rgba(0,0,0,.06); }
-    .panel h3 { margin:.2rem 0 .6rem; border-bottom:1px dashed var(--border); padding-bottom:.25rem; }
-    input, textarea, select { width:100%; padding:.55rem .65rem; border:1px solid var(--border); border-radius:10px; background:#fff; }
-    .actions { display:flex; gap:.5rem; }
-    .btn { padding:.5rem .8rem; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer; }
-    .btn.primary { background:var(--accent,#111827); color:#fff; border-color:var(--accent,#111827); }
-    .hint { font-size:.8rem; color:var(--muted); }
-    .color-row { display:flex; gap:.5rem; align-items:center; }
-    .chip-preview { width:28px; height:18px; border-radius:6px; border:1px solid var(--border); background:#ddd; }
-    
-    /* Stage context indicator */
-    .stage-context { 
-      padding: .5rem .75rem; 
-      background: var(--stage-color, #e5e7eb); 
-      color: #fff; 
-      border-radius: 8px; 
-      font-weight: 600; 
-      text-align: center;
-      margin-bottom: 1rem;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    }
-    
-    /* Save confirmation */
-    .save-confirmation {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #10b981;
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      transform: translateX(400px);
-      transition: transform 0.3s ease;
-      z-index: 1000;
-    }
-    .save-confirmation.show {
-      transform: translateX(0);
-    }
-    
-    /* Method context indicator */
-    .method-context {
-      padding: .4rem .6rem;
-      background: var(--method-color, #f3f4f6);
-      color: #374151;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      margin-bottom: 0.5rem;
-      border-left: 3px solid var(--method-color, #d1d5db);
-    }
-  </style>
+
+
+<link rel="stylesheet" href="admin.css">
+
+
+
+
+
+
+
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script>
-    let currentStageId = null;
-    let currentMethodId = null;
-    let currentStageColor = null;
+  <script src="admin.js"></script>
 
-    // Exact color mapping from dashboard image
-    const DASHBOARD_COLORS = {
-      'EMPATHIZE': '#06b6d4',  // bright cyan
-      'DEFINE': '#10b981',     // vibrant green
-      'IDEATE': '#f59e0b',     // bright orange
-      'PROTOTYPE': '#ef4444',  // vivid red
-      'TEST': '#7f1d1d'        // dark maroon
-    };
-
-    // Get the correct color for a stage, prioritizing dashboard colors
-    function getStageColor(stageName, dbColor) {
-      if (stageName && DASHBOARD_COLORS[stageName]) {
-        return DASHBOARD_COLORS[stageName];
-      }
-      return dbColor || '#3b82f6';
-    }
-
-    // Show save confirmation
-    function showSaveConfirmation(message) {
-      const confirmation = document.createElement('div');
-      confirmation.className = 'save-confirmation';
-      confirmation.textContent = message;
-      document.body.appendChild(confirmation);
-      
-      // Trigger animation
-      setTimeout(() => confirmation.classList.add('show'), 100);
-      
-      // Remove after 3 seconds
-      setTimeout(() => {
-        confirmation.classList.remove('show');
-        setTimeout(() => document.body.removeChild(confirmation), 300);
-      }, 3000);
-    }
-
-    async function loadStages() {
-      try {
-        const res = await axios.get('api/admin_stages.php');
-        const list = document.getElementById('stage-list');
-        list.innerHTML='';
-        res.data.forEach(s => {
-          const b = document.createElement('button');
-          b.textContent = `${s.stage_id}. ${s.name}`;
-          
-          // Apply dashboard colors to the button background
-          const stageColor = getStageColor(s.name, s.color_code);
-          b.style.borderLeftColor = stageColor;
-          b.style.borderLeftWidth = '4px';
-          b.style.borderLeftStyle = 'solid';
-          
-          b.onclick = ()=> selectStage(s);
-          list.appendChild(b);
-        });
-      } catch (error) {
-        console.error('Error loading stages:', error);
-        const list = document.getElementById('stage-list');
-        list.innerHTML = `<div style="color: red; padding: 1rem; text-align: center;">
-          ❌ Error loading stages: ${error.response?.data?.error || error.message}<br>
-          <small>Check if XAMPP MySQL is running and database exists</small>
-        </div>`;
-      }
-    }
-    
-    function selectStage(s){
-      // Remove previous selections
-      document.querySelectorAll('#stage-list button').forEach(btn => btn.classList.remove('selected'));
-      document.querySelectorAll('#method-list button').forEach(btn => btn.classList.remove('selected'));
-      
-      currentStageId = s.stage_id;
-      currentMethodId = null;
-      
-      // Use dashboard colors instead of database colors for consistency
-      currentStageColor = getStageColor(s.name, s.color_code);
-      
-      // Highlight selected stage
-      event.target.classList.add('selected');
-      
-      // Update stage context indicator with correct color
-      updateStageContext(s.name, currentStageColor);
-      
-      document.getElementById('stage-id').value = s.stage_id;
-      document.getElementById('stage-name').value = s.name || '';
-      document.getElementById('stage-desc').value = s.description || '';
-      document.getElementById('stage-color').value = currentStageColor; // Use dashboard color
-      document.getElementById('stage-color-picker').value = currentStageColor; // Use dashboard color
-      document.getElementById('stage-color-preview').style.background = currentStageColor; // Use dashboard color
-      clearMethodForm();
-      clearSectionForm();
-      document.getElementById('method-list').innerHTML='';
-      document.getElementById('section-list').innerHTML='';
-      loadMethodsForStage();
-    }
-    
-    function updateStageContext(stageName, color) {
-      const contextEl = document.getElementById('stage-context');
-      if (contextEl) {
-        contextEl.textContent = `Current Stage: ${stageName}`;
-        contextEl.style.setProperty('--stage-color', color);
-      }
-    }
-    
-    function updateMethodContext(methodTitle) {
-      const contextEl = document.getElementById('method-context');
-      if (contextEl) {
-        contextEl.textContent = `Current Method: ${methodTitle}`;
-        contextEl.style.setProperty('--method-color', currentStageColor);
-      }
-    }
-    
-    async function saveStage(){
-      const id = document.getElementById('stage-id').value;
-      const name = document.getElementById('stage-name').value;
-      const colorVal = (document.getElementById('stage-color').value || '').trim();
-      
-      // Use dashboard color if available, otherwise use custom color
-      const finalColor = getStageColor(name, colorVal);
-      
-      const payload = { 
-        name: name, 
-        description: document.getElementById('stage-desc').value, 
-        color_code: finalColor 
-      };
-      
-      if(id){ payload.stage_id=parseInt(id); await axios.put('api/admin_stages.php', payload); }
-      else { await axios.post('api/admin_stages.php', payload); }
-      await loadStages();
-      
-      // Show confirmation
-      showSaveConfirmation('Stage saved successfully!');
-      
-      // Update context if this was the current stage
-      if (currentStageId && id) {
-        currentStageColor = finalColor;
-        updateStageContext(name, finalColor);
-      }
-    }
-    
-    async function newStage(){ 
-      currentStageId=null; 
-      currentMethodId = null;
-      document.getElementById('stage-id').value=''; 
-      document.getElementById('stage-name').value=''; 
-      document.getElementById('stage-desc').value=''; 
-      document.getElementById('stage-color').value=''; 
-      document.getElementById('stage-color-picker').value = '#3b82f6'; 
-      document.getElementById('stage-color-preview').style.background='#e5e7eb'; 
-      document.getElementById('method-list').innerHTML=''; 
-      document.getElementById('section-list').innerHTML='';
-      
-      // Clear context indicators
-      updateStageContext('None', '#e5e7eb');
-      updateMethodContext('None');
-      
-      // Remove selections
-      document.querySelectorAll('#stage-list button').forEach(btn => btn.classList.remove('selected'));
-      document.querySelectorAll('#method-list button').forEach(btn => btn.classList.remove('selected'));
-    }
-    
-    function toColorOrDefault(hex){
-      const m = /^#?[0-9a-fA-F]{6}$/.test(hex||'') ? (hex[0]==='#'?hex:'#'+hex) : '#3b82f6';
-      return m;
-    }
-    
-    function syncColorFromPicker(){
-      const v = document.getElementById('stage-color-picker').value;
-      document.getElementById('stage-color').value = v;
-      document.getElementById('stage-color-preview').style.background = v;
-    }
-    
-    function syncColorFromText(){
-      const t = document.getElementById('stage-color').value.trim();
-      const v = toColorOrDefault(t);
-      document.getElementById('stage-color-picker').value = v;
-      document.getElementById('stage-color-preview').style.background = t || '#e5e7eb';
-    }
-    
-    async function deleteStage(){ 
-      const id=document.getElementById('stage-id').value; 
-      if(!id) return; 
-      await axios.delete('api/admin_stages.php?stage_id='+id); 
-      await newStage(); 
-      await loadStages(); 
-      showSaveConfirmation('Stage deleted successfully!');
-    }
-
-    async function loadMethodsForStage(){
-      const stageIdAtRequest = currentStageId;
-      if(!stageIdAtRequest){ document.getElementById('method-list').innerHTML=''; return; }
-      try {
-        const res = await axios.get('api/admin_methods.php?stage_id='+stageIdAtRequest);
-        const list = document.getElementById('method-list'); list.innerHTML='';
-        if (stageIdAtRequest !== currentStageId) return; // stale response guard
-        res.data.forEach(m=>{
-          const b=document.createElement('button');
-          b.textContent=`${m.method_id}. ${m.title}`;
-          b.onclick=()=> selectMethod(m);
-          list.appendChild(b);
-        });
-      } catch (error) {
-        console.error('Error loading methods:', error);
-        const list = document.getElementById('method-list');
-        list.innerHTML = `<div style="color: red; padding: 1rem; text-align: center;">
-          ❌ Error loading methods: ${error.response?.data?.error || error.message}
-        </div>`;
-      }
-    }
-    
-    function selectMethod(m){
-      // Remove previous method selections
-      document.querySelectorAll('#method-list button').forEach(btn => btn.classList.remove('selected'));
-      
-      currentMethodId = m.method_id;
-      
-      // Highlight selected method
-      event.target.classList.add('selected');
-      
-      // Update method context
-      updateMethodContext(m.title);
-      
-      clearMethodForm();
-      document.getElementById('method-id').value=m.method_id;
-      document.getElementById('method-title').value=m.title||'';
-      document.getElementById('method-short').value=m.short_desc||'';
-      document.getElementById('method-long').value=m.long_desc||'';
-      document.getElementById('method-resources').value=m.resources||'';
-      clearSectionForm();
-      loadSections();
-    }
-    
-    async function saveMethod(){
-      const payload={ method_id: parseInt(document.getElementById('method-id').value||0), title:document.getElementById('method-title').value, short_desc:document.getElementById('method-short').value, long_desc:document.getElementById('method-long').value, resources:document.getElementById('method-resources').value, stage_id: currentStageId };
-      if(payload.method_id){ await axios.put('api/admin_methods.php', payload); } else { const r=await axios.post('api/admin_methods.php', payload); document.getElementById('method-id').value=r.data.method_id; }
-      await loadMethodsForStage();
-      
-      // Show confirmation
-      showSaveConfirmation('Method saved successfully!');
-      
-      // Update context if this was the current method
-      if (currentMethodId && payload.method_id) {
-        updateMethodContext(document.getElementById('method-title').value);
-      }
-    }
-    
-    function clearMethodForm(){ document.getElementById('method-id').value=''; document.getElementById('method-title').value=''; document.getElementById('method-short').value=''; document.getElementById('method-long').value=''; document.getElementById('method-resources').value=''; }
-    
-    async function newMethod(){ 
-      currentMethodId=null; 
-      clearMethodForm(); 
-      document.getElementById('section-list').innerHTML=''; 
-      clearSectionForm(); 
-      updateMethodContext('None');
-      
-      // Remove method selections
-      document.querySelectorAll('#method-list button').forEach(btn => btn.classList.remove('selected'));
-    }
-    
-    async function deleteMethod(){ 
-      const id=document.getElementById('method-id').value; 
-      if(!id) return; 
-      await axios.delete('api/admin_methods.php?method_id='+id); 
-      await newMethod(); 
-      await loadMethodsForStage(); 
-      showSaveConfirmation('Method deleted successfully!');
-    }
-
-    async function loadSections(){
-      const list=document.getElementById('section-list'); list.innerHTML='';
-      const methodIdAtRequest = currentMethodId;
-      if(!methodIdAtRequest) return;
-      try {
-        const res = await axios.get('api/admin_sections.php?method_id='+methodIdAtRequest);
-        if (methodIdAtRequest !== currentMethodId) return; // stale response guard
-        res.data.forEach(s=>{
-          const b=document.createElement('button');
-          const label = s.parent_section_id?`↳ ${s.title}`:`${s.section_id}. ${s.title}`;
-          b.textContent=label; b.onclick=()=> selectSection(s); list.appendChild(b);
-        });
-      } catch (error) {
-        console.error('Error loading sections:', error);
-        const list = document.getElementById('section-list');
-        list.innerHTML = `<div style="color: red; padding: 1rem; text-align: center;">
-          ❌ Error loading sections: ${error.response?.data?.error || error.message}
-        </div>`;
-      }
-    }
-    
-    function selectSection(s){
-      clearSectionForm();
-      document.getElementById('section-id').value = s.section_id;
-      document.getElementById('section-title').value = s.title||'';
-      document.getElementById('section-desc').value = s.description||'';
-      document.getElementById('section-parent').value = s.parent_section_id||'';
-    }
-    
-    async function saveSection(){
-      const payload={ section_id: parseInt(document.getElementById('section-id').value||0), method_id: currentMethodId, title: document.getElementById('section-title').value, description: document.getElementById('section-desc').value, parent_section_id: document.getElementById('section-parent').value||null };
-      if(!payload.method_id){ alert('Select a method first'); return; }
-      if(payload.section_id){ await axios.put('api/admin_sections.php', payload); } else { const r=await axios.post('api/admin_sections.php', payload); document.getElementById('section-id').value=r.data.section_id; }
-      await loadSections();
-      
-      // Show confirmation
-      showSaveConfirmation('Section saved successfully!');
-    }
-    
-    function clearSectionForm(){ document.getElementById('section-id').value=''; document.getElementById('section-title').value=''; document.getElementById('section-desc').value=''; document.getElementById('section-parent').value=''; }
-    
-    async function newSection(){ clearSectionForm(); }
-    
-    async function deleteSection(){ 
-      const id=document.getElementById('section-id').value; 
-      if(!id) return; 
-      await axios.delete('api/admin_sections.php?section_id='+id); 
-      await newSection(); 
-      await loadSections(); 
-      showSaveConfirmation('Section deleted successfully!');
-    }
-
-    window.addEventListener('DOMContentLoaded', ()=>{
-      loadStages();
-      const picker = document.getElementById('stage-color-picker');
-      if (picker) picker.addEventListener('input', syncColorFromPicker);
-      const input = document.getElementById('stage-color');
-      if (input) input.addEventListener('input', syncColorFromText);
-      
-      // Initialize context indicators
-      updateStageContext('None', '#e5e7eb');
-      updateMethodContext('None');
-    });
-  </script>
+  
 </head>
 <body>
   <div class="admin-grid">
     <aside class="admin-sidebar">
-      <h3>Stages</h3>
-      <div id="stage-list" class="list stack"></div>
+      <h3>Stages <span class="drag-hint">(Drag to reorder)</span></h3>
+      <div id="stage-list" class="list stack" id="stages-draggable"></div>
+      
+      <div class="undo-section" style="margin: 0.75rem 0;">
+        <button class="btn restore" onclick="undoDeletedStages()" id="undo-stages-btn" style="display: none;">
+          <span class="undo-icon">↶</span>
+          Undo Deleted Stages
+        </button>
+      </div>
+      
       <div class="panel" style="margin-top:.75rem;">
         <div class="stack">
           <input id="stage-id" type="hidden" />
           <label>Name<input id="stage-name" /></label>
           <label>Description<textarea id="stage-desc" rows="3"></textarea></label>
           
-          <!-- Dashboard Color Reference -->
-          <div style="margin: 0.5rem 0; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">Dashboard Colors (Auto-applied):</div>
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <div style="display: flex; align-items: center; gap: 0.25rem;">
-                <div style="width: 16px; height: 16px; border-radius: 4px; background: #06b6d4; border: 1px solid #e2e8f0;"></div>
-                <span style="font-size: 0.8rem;">EMPATHIZE</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem;">
-                <div style="width: 16px; height: 16px; border-radius: 4px; background: #10b981; border: 1px solid #e2e8f0;"></div>
-                <span style="font-size: 0.8rem;">DEFINE</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem;">
-                <div style="width: 16px; height: 16px; border-radius: 4px; background: #f59e0b; border: 1px solid #e2e8f0;"></div>
-                <span style="font-size: 0.8rem;">IDEATE</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem;">
-                <div style="width: 16px; height: 16px; border-radius: 4px; background: #ef4444; border: 1px solid #e2e8f0;"></div>
-                <span style="font-size: 0.8rem;">PROTOTYPE</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.25rem;">
-                <div style="width: 16px; height: 16px; border-radius: 4px; background: #7f1d1d; border: 1px solid #e2e8f0;"></div>
-                <span style="font-size: 0.8rem;">TEST</span>
-              </div>
+          <div class="mode-colors">
+            <div class="title">Mode Colors (Customizable):</div>
+            <div id="mode-color-list">
+              <div style="padding: 1rem; text-align: center; color: #6b7280;">
+                Loading mode colors...<br>
+                <small>If this doesn't change, click the test button below</small>
+          </div>
             </div>
+
           </div>
           
-          <div class="color-row">
-            <label style="flex:1;">Color (optional)
-              <input id="stage-color" placeholder="#hex or empty" />
-            </label>
-            <input id="stage-color-picker" type="color" style="width:44px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px;">
-            <span class="chip-preview" id="stage-color-preview"></span>
-          </div>
-          <span class="hint">Pick a color or leave blank to use dashboard colors. Dashboard colors will automatically override custom colors for consistency.</span>
+
           <div class="actions">
             <button class="btn" onclick="newStage()">New</button>
             <button class="btn primary" onclick="saveStage()">Save</button>
@@ -461,7 +80,6 @@
       </div>
     </aside>
     <main class="admin-content">
-      <!-- Stage Context Indicator -->
       <div class="stage-context" id="stage-context">Current Stage: None</div>
       
       <h2>Methods</h2>
@@ -471,14 +89,39 @@
         </div>
         <div class="panel" style="flex:2;">
           <h3>Edit Method</h3>
-          <!-- Method Context Indicator -->
           <div class="method-context" id="method-context">Current Method: None</div>
           <div class="stack">
             <input id="method-id" type="hidden" />
-            <label>Title<input id="method-title" /></label>
+            <label>Method Title<input id="method-title" placeholder="Enter method title" /></label>
+    
             <label>Short Description<textarea id="method-short" rows="2"></textarea></label>
-            <label>Long Description<textarea id="method-long" rows="6"></textarea></label>
+            <label>Long Description (Optional)<textarea id="method-long" rows="6" placeholder="Leave empty if no detailed description needed"></textarea></label>
+            <label>Method Image (Optional)
+              <div class="image-upload-area">
+                <input id="method-image" type="file" accept="image/*" class="file-input" />
+                <div class="upload-placeholder">
+                  <div class="upload-icon">📷</div>
+                  <div class="upload-text">Click to select an image</div>
+                  <div class="upload-hint">PNG, JPG up to 5MB</div>
+                </div>
+              </div>
+            </label>
+            <div id="current-image-preview" class="image-preview-area">
+              <div class="preview-container">
+                <img id="image-preview" class="preview-image" />
+                <div class="preview-overlay">
+                  <button type="button" onclick="removeImage()" class="remove-btn">Remove</button>
+                </div>
+              </div>
+            </div>
             <label>Resources<textarea id="method-resources" rows="2"></textarea></label>
+            
+            <div class="mode-selection">
+              <label class="mode-label">Select Modes/Modules:</label>
+              <div class="mode-checkboxes" id="dynamic-mode-checkboxes">
+              </div>
+            </div>
+            
             <div class="actions">
               <button class="btn" onclick="newMethod()">New</button>
               <button class="btn primary" onclick="saveMethod()">Save</button>
@@ -494,11 +137,13 @@
         </div>
         <div class="panel" style="flex:2;">
           <h3>Edit Section</h3>
+          <div class="method-context" id="current-method-name">None selected</div>
           <div class="stack">
             <input id="section-id" type="hidden" />
-            <label>Title<input id="section-title" /></label>
+            <label>Title (Optional)<input id="section-title" placeholder="Leave empty if no title needed" /></label>
             <label>Description<textarea id="section-desc" rows="4"></textarea></label>
-            <label>Parent Section Id (optional)<input id="section-parent" placeholder="e.g. parent section_id" /></label>
+            <label>Parent Section ID<input id="section-parent" placeholder="Leave empty for top-level section" /></label>
+            
             <div class="actions">
               <button class="btn" onclick="newSection()">New</button>
               <button class="btn primary" onclick="saveSection()">Save</button>
@@ -511,5 +156,3 @@
   </div>
 </body>
 </html>
-
-

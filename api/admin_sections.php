@@ -1,10 +1,40 @@
 <?php
+/* 
+==========================================
+DESIGN THINKING BOOKLET - SECTIONS API
+==========================================
+
+This API manages the detailed sections within each method in the booklet.
+Sections provide step-by-step instructions and detailed information for each method.
+
+API ENDPOINTS:
+- GET: Retrieve all sections for a specific method
+- POST: Create a new section within a method
+- PUT: Update section content (title, description, parent relationships)
+- DELETE: Remove a section from a method
+
+KEY FEATURES:
+- Hierarchical section structure (parent-child relationships)
+- Optional section titles (some sections don't need titles)
+- Rich text content for detailed method instructions
+- Tree-like organization for complex methods
+
+TEACHER NOTE: This API manages the detailed content that appears in the booklet pages.
+Sections are what students see when they open a method in the booklet.
+*/
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 include './db.php';
+
+if (!$conn) {
+    http_response_code(500);
+    echo json_encode(["error" => "Database connection failed"]);
+    exit;
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -13,15 +43,30 @@ if ($method === 'GET') {
   $id = isset($_GET['section_id']) ? intval($_GET['section_id']) : null;
   if ($id) {
     $res = $conn->query("SELECT * FROM method_sections WHERE section_id=$id");
+    if (!$res) {
+        http_response_code(500);
+        echo json_encode(["error" => "Database query failed: " . $conn->error]);
+        exit;
+    }
     echo json_encode($res && $res->num_rows ? $res->fetch_assoc() : null);
   } else if ($methodId) {
     $rows = [];
     $res = $conn->query("SELECT * FROM method_sections WHERE method_id=$methodId ORDER BY COALESCE(parent_section_id, section_id), section_id");
+    if (!$res) {
+        http_response_code(500);
+        echo json_encode(["error" => "Database query failed: " . $conn->error]);
+        exit;
+    }
     while ($r=$res->fetch_assoc()) $rows[]=$r;
     echo json_encode($rows);
   } else {
     $rows = [];
     $res = $conn->query("SELECT * FROM method_sections ORDER BY section_id");
+    if (!$res) {
+        http_response_code(500);
+        echo json_encode(["error" => "Database query failed: " . $conn->error]);
+        exit;
+    }
     while ($r=$res->fetch_assoc()) $rows[]=$r;
     echo json_encode($rows);
   }
@@ -64,7 +109,15 @@ if ($method === 'PUT') {
 if ($method === 'DELETE') {
   $id = isset($_GET['section_id']) ? intval($_GET['section_id']) : intval($body['section_id'] ?? 0);
   if (!$id) { http_response_code(400); echo json_encode(["error"=>'section_id required']); exit; }
-  if ($conn->query("DELETE FROM method_sections WHERE section_id=$id")) { echo json_encode(["deleted"=>1]); } else { http_response_code(500); echo json_encode(["error"=>$conn->error]); }
+  
+  $conn->query("UPDATE method_sections SET parent_section_id = NULL WHERE parent_section_id = $id");
+  
+  if ($conn->query("DELETE FROM method_sections WHERE section_id=$id")) { 
+    echo json_encode(["deleted"=>1]); 
+  } else { 
+    http_response_code(500); 
+    echo json_encode(["error"=>$conn->error]); 
+  }
   exit;
 }
 

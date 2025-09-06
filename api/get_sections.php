@@ -17,7 +17,6 @@ while ($row = $result->fetch_assoc()) {
   $rows[] = $row;
 }
 
-// Build nested structure
 $byId = [];
 foreach ($rows as $r) {
   $r['children'] = [];
