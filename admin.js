@@ -32,7 +32,13 @@ let currentMethodId = null;
 let currentStageColor = null;
 
 // Color Management for Dashboard
-const DASHBOARD_COLORS = {};
+const DASHBOARD_COLORS = {
+    'EMPATHIZE': '#06b6d4',
+    'DEFINE': '#10b981',
+    'IDEATE': '#f59e0b',
+    'PROTOTYPE': '#ef4444',
+    'TEST': '#7f1d1d'
+};
 
 
 function getStageColor(stageName, dbColor) {
@@ -77,6 +83,8 @@ async function loadStages() {
             b.style.borderLeftColor = stageColor;
             b.style.borderLeftWidth = '4px';
             b.style.borderLeftStyle = 'solid';
+            b.style.backgroundColor = stageColor;
+            b.style.color = '#ffffff';
 
             b.addEventListener('dragstart', handleDragStart);
             b.addEventListener('dragover', handleDragOver);
@@ -106,6 +114,9 @@ function selectStage(s) {
 
     currentStageId = s.stage_id;
     currentMethodId = null;
+
+    console.log('🎯 Stage selected:', s.name, 'ID:', s.stage_id);
+    console.log('🎯 currentStageId set to:', currentStageId);
 
     currentStageColor = getStageColor(s.name, s.color_code);
 
@@ -362,6 +373,7 @@ async function saveMethod() {
         selectedModes.push(cb.value);
     });
 
+
     let imageUrl = '';
     const imageFile = document.getElementById('method-image').files[0];
     if (imageFile) {
@@ -374,23 +386,86 @@ async function saveMethod() {
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            imageUrl = e.target.result;
-            console.log('🖼️ Image converted to base64, length:', imageUrl.length);
-        };
+        // Wait for image to be processed and compressed before continuing
+        try {
+            imageUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const originalResult = e.target.result;
+                    console.log('🖼️ Original image converted to base64, length:', originalResult.length);
 
-        reader.onerror = function () {
-            console.error('❌ Error reading image file');
-            alert('Error processing the image file. Please try again.');
-        };
+                    // Check if the result is valid
+                    if (!originalResult || originalResult.length < 100) {
+                        console.error('❌ Invalid image data generated');
+                        reject(new Error('Invalid image data. Please try a different image.'));
+                        return;
+                    }
 
-        reader.readAsDataURL(imageFile);
+                    // Check for common issues
+                    if (!originalResult.includes('data:image/')) {
+                        console.error('❌ Invalid image data URL format');
+                        reject(new Error('Invalid image format. Please try a different image.'));
+                        return;
+                    }
 
-        await new Promise((resolve, reject) => {
-            reader.onloadend = resolve;
-            reader.onerror = reject;
-        });
+                    // Compress image if it's too large (>500KB base64)
+                    if (originalResult.length > 500000) {
+                        console.log('🖼️ Image is large, compressing...');
+
+                        const img = new Image();
+                        img.onload = function () {
+                            console.log('🖼️ Original image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+
+                            // Create canvas for compression
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+
+                            // Calculate new dimensions (max 800px width/height)
+                            let { width, height } = img;
+                            const maxDimension = 800;
+                            if (width > maxDimension || height > maxDimension) {
+                                if (width > height) {
+                                    height = (height * maxDimension) / width;
+                                    width = maxDimension;
+                                } else {
+                                    width = (width * maxDimension) / height;
+                                    height = maxDimension;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+
+                            // Draw and compress
+                            ctx.drawImage(img, 0, 0, width, height);
+                            const compressedResult = canvas.toDataURL('image/jpeg', 0.8); // 80% quality
+
+                            console.log('🖼️ Compressed image dimensions:', width, 'x', height);
+                            console.log('🖼️ Compressed base64 length:', compressedResult.length);
+                            console.log('🖼️ Compression ratio:', Math.round((1 - compressedResult.length / originalResult.length) * 100) + '%');
+
+                            resolve(compressedResult);
+                        };
+                        img.onerror = function () {
+                            console.error('❌ Error loading image for compression');
+                            reject(new Error('Error loading image for processing. Please try a different image.'));
+                        };
+                        img.src = originalResult;
+                    } else {
+                        resolve(originalResult);
+                    }
+                };
+                reader.onerror = function () {
+                    console.error('❌ Error reading image file');
+                    reject(new Error('Error processing the image file. Please try again.'));
+                };
+                reader.readAsDataURL(imageFile);
+            });
+        } catch (error) {
+            console.error('❌ Image processing failed:', error);
+            alert(error.message);
+            return;
+        }
     }
 
     const payload = {
@@ -404,13 +479,30 @@ async function saveMethod() {
         modes: selectedModes
     };
 
+    console.log('🖼️ Image URL length:', imageUrl ? imageUrl.length : 0);
+    console.log('🖼️ Image URL preview:', imageUrl ? imageUrl.substring(0, 50) + '...' : 'No image');
+
+    if (!currentStageId) {
+        console.log('⚠️ WARNING: currentStageId is null/undefined!');
+        const selectedStageBtn = document.querySelector('#stage-list button.selected');
+        if (selectedStageBtn) {
+            const stageId = selectedStageBtn.dataset.stageId;
+            console.log('🔧 Attempting to get stageId from selected button:', stageId);
+            if (stageId) {
+                payload.stage_id = parseInt(stageId);
+                console.log('🔧 Updated payload.stage_id to:', payload.stage_id);
+            }
+        }
+    }
+
     try {
+        let response;
         if (payload.method_id) {
-            await axios.put('api/admin_methods.php', payload);
+            response = await axios.put('api/admin_methods.php', payload);
         } else {
-            const r = await axios.post('api/admin_methods.php', payload);
-            document.getElementById('method-id').value = r.data.method_id;
-            currentMethodId = r.data.method_id;
+            response = await axios.post('api/admin_methods.php', payload);
+            document.getElementById('method-id').value = response.data.method_id;
+            currentMethodId = response.data.method_id;
         }
 
         await loadMethodsForStage();
@@ -455,10 +547,13 @@ async function newMethod() {
     const selectedStageBtn = document.querySelector('#stage-list button.selected');
     if (selectedStageBtn) {
         const currentStageName = selectedStageBtn.textContent.split('. ')[1]; // Extract name after "1. "
-        console.log('Auto-checking mode for stage:', currentStageName);
+        console.log('🎯 Creating new method for stage:', currentStageName);
+        console.log('🎯 currentStageId is:', currentStageId);
 
         if (currentStageName) {
-            const modeCheckbox = document.getElementById('mode-' + currentStageName.toLowerCase());
+            // Handle stage names with spaces and special characters
+            const normalizedStageName = currentStageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            const modeCheckbox = document.getElementById('mode-' + normalizedStageName);
 
             if (modeCheckbox) {
                 document.querySelectorAll('.mode-checkbox input[type="checkbox"]').forEach(cb => {
@@ -466,9 +561,37 @@ async function newMethod() {
                 });
 
                 modeCheckbox.checked = true;
-                console.log('✅ Auto-checked mode:', currentStageName);
+            } else {
+                document.querySelectorAll('.mode-checkbox input[type="checkbox"]').forEach(cb => {
+                    console.log('  - ID:', cb.id, 'Value:', cb.value);
+                });
+
+                // Try to find the checkbox with different variations
+                const variations = [
+                    'mode-' + normalizedStageName,
+                    'mode-' + currentStageName.toLowerCase(),
+                    'mode-' + currentStageName.toUpperCase(),
+                    'mode-' + currentStageName.toLowerCase().replace(/\s+/g, ''),
+                    'mode-' + currentStageName.toUpperCase().replace(/\s+/g, ''),
+                    'mode-' + currentStageName.replace(/\s+/g, '-').toLowerCase(),
+                    'mode-' + currentStageName.replace(/\s+/g, '_').toLowerCase()
+                ];
+
+                for (const variation of variations) {
+                    const checkbox = document.getElementById(variation);
+                    if (checkbox) {
+                        console.log('🔧 Found checkbox with variation:', variation);
+                        document.querySelectorAll('.mode-checkbox input[type="checkbox"]').forEach(cb => {
+                            cb.checked = false;
+                        });
+                        checkbox.checked = true;
+                        break;
+                    }
+                }
             }
         }
+    } else {
+        console.log('⚠️ No stage selected when creating new method');
     }
 }
 
@@ -633,7 +756,6 @@ async function deleteSection() {
 
 async function loadModeColors() {
     try {
-        console.log('🔄 Starting loadModeColors...');
 
         const stagesRes = await axios.get('api/admin_stages.php');
         const stages = stagesRes.data;
@@ -655,7 +777,6 @@ async function loadModeColors() {
             description: stage.description || `Mode for ${stage.name} stage`
         }));
 
-        console.log('🎨 Modes created from stages:', modesFromStages);
 
         Object.keys(DASHBOARD_COLORS).forEach(key => delete DASHBOARD_COLORS[key]);
         modesFromStages.forEach(mode => {
@@ -668,7 +789,6 @@ async function loadModeColors() {
             return;
         }
 
-        console.log('✅ Found mode-color-list element, populating...');
 
         modeList.innerHTML = '';
 
@@ -686,13 +806,10 @@ async function loadModeColors() {
         </div>
       `;
             modeList.appendChild(modeDiv);
-            console.log('✅ Added mode color item for:', mode.name, 'with color:', mode.color_code);
         });
 
         populateModeCheckboxes(modesFromStages);
 
-        console.log('✅ Mode colors loaded successfully:', DASHBOARD_COLORS);
-        console.log('✅ Mode color list populated with', modesFromStages.length, 'items');
 
     } catch (error) {
         console.error('Error loading mode colors:', error);
@@ -708,6 +825,7 @@ function populateModeCheckboxes(modes) {
     if (!container) return;
 
     container.innerHTML = '';
+    console.log('🔧 Creating mode checkboxes for:', modes.map(m => m.name));
 
     modes.forEach(mode => {
         const label = document.createElement('label');
@@ -715,8 +833,12 @@ function populateModeCheckboxes(modes) {
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.id = `mode-${mode.name.toLowerCase()}`;
+        // Handle mode names with spaces and special characters
+        const normalizedModeName = mode.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        checkbox.id = `mode-${normalizedModeName}`;
         checkbox.value = mode.name;
+
+        console.log('🔧 Created checkbox:', checkbox.id, 'for mode:', mode.name, '(normalized from:', normalizedModeName + ')');
 
         const colorSpan = document.createElement('span');
         colorSpan.className = 'mode-color';
@@ -732,7 +854,6 @@ function populateModeCheckboxes(modes) {
         container.appendChild(label);
     });
 
-    console.log('✅ Dynamic mode checkboxes populated:', modes.length, 'modes');
 }
 
 async function loadMethodModes(methodId) {
@@ -744,11 +865,23 @@ async function loadMethodModes(methodId) {
             cb.checked = false;
         });
 
+        // Debug: Show all available checkboxes
+        document.querySelectorAll('.mode-checkbox input[type="checkbox"]').forEach(cb => {
+            console.log('  - ID:', cb.id, 'Value:', cb.value);
+        });
+
         if (method.modes) {
             method.modes.forEach(mode => {
-                const checkbox = document.getElementById('mode-' + mode.toLowerCase());
+                const normalizedModeName = mode.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                const checkbox = document.getElementById('mode-' + normalizedModeName);
                 if (checkbox) {
                     checkbox.checked = true;
+                } else {
+                    // Try alternative lookup
+                    const altCheckbox = document.getElementById('mode-' + mode.toLowerCase());
+                    if (altCheckbox) {
+                        altCheckbox.checked = true;
+                    }
                 }
             });
         }
@@ -811,7 +944,6 @@ async function updateStageColor(stageName, newColor) {
                 updateStageContext(stage.name, newColor);
             }
 
-            console.log('🎨 Color updated for', stageName, 'to', newColor);
         }
     } catch (error) {
         console.error('Error updating stage color:', error);
@@ -864,8 +996,6 @@ function previewImage(event) {
                 };
 
                 imagePreview.onload = function () {
-                    console.log('✅ Image preview loaded successfully');
-                    console.log('✅ Image dimensions:', imagePreview.naturalWidth, 'x', imagePreview.naturalHeight);
                 };
             }
         };
@@ -903,6 +1033,11 @@ function loadMethodImage(methodId) {
                 console.log('🖼️ Image URL exists:', !!method.image_url);
                 console.log('🖼️ Image URL length:', method.image_url ? method.image_url.length : 0);
 
+                console.log('🖼️ Checking image data for method:', method.method_id);
+                console.log('🖼️ Image URL exists:', !!method.image_url);
+                console.log('🖼️ Image URL length:', method.image_url ? method.image_url.length : 0);
+                console.log('🖼️ Image URL starts with:', method.image_url ? method.image_url.substring(0, 50) : 'No image');
+
                 if (method.image_url && method.image_url.trim() !== '' && method.image_url.trim().startsWith('data:image/') && method.image_url.trim().length > 100) {
                     console.log('🖼️ Valid image data found, setting preview...');
                     const imagePreview = document.getElementById('image-preview');
@@ -920,8 +1055,6 @@ function loadMethodImage(methodId) {
                         console.log('🖼️ Image preview container displayed');
 
                         imagePreview.onload = function () {
-                            console.log('✅ Image from database loaded successfully');
-                            console.log('✅ Image dimensions:', imagePreview.naturalWidth, 'x', imagePreview.naturalHeight);
                         };
 
                         imagePreview.onerror = function () {

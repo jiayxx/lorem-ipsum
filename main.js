@@ -49,9 +49,37 @@ function getModeColor(modeName) {
     return MODE_COLORS[modeName] || '#6b7280';
 }
 
+function updateCSSVariables(stages) {
+    // Update CSS variables for dynamic stage colors
+    const root = document.documentElement;
+
+    // Default stage colors (for the 5 main stages)
+    const defaultColors = {
+        'EMPATHIZE': '#06b6d4',
+        'DEFINE': '#10b981',
+        'IDEATE': '#f59e0b',
+        'PROTOTYPE': '#ef4444',
+        'TEST': '#7f1d1d'
+    };
+
+    // Update CSS variables for each stage
+    stages.forEach((stage, index) => {
+        const color = stage.color_code || defaultColors[stage.name] || '#3b82f6';
+        root.style.setProperty(`--stage-color-${index + 1}`, color);
+    });
+
+    // If we have more than 5 stages, add additional variables
+    if (stages.length > 5) {
+        stages.slice(5).forEach((stage, index) => {
+            const color = stage.color_code || '#3b82f6';
+            root.style.setProperty(`--stage-color-${index + 6}`, color);
+        });
+    }
+}
+
 async function loadModeColors() {
     try {
-        const response = await axios.get('http://localhost/lorem%20ipsum/api/admin_stages.php');
+        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_stages.php');
         const stages = response.data;
 
         Object.keys(MODE_COLORS).forEach(key => delete MODE_COLORS[key]);
@@ -60,7 +88,9 @@ async function loadModeColors() {
             MODE_COLORS[stage.name.toUpperCase()] = stage.color_code || '#3b82f6';
         });
 
-        console.log('🎨 Mode colors loaded from stages (same as admin):', MODE_COLORS);
+        // Update CSS variables for dynamic colors
+        updateCSSVariables(stages);
+
 
 
     } catch (error) {
@@ -79,8 +109,9 @@ function loadStagesFromAPI() {
     const timestamp = new Date().getTime();
 
     console.log('🔍 Fetching fresh stages data...');
+    console.log('🔗 API URL:', `http://localhost/lorem-ipsum/api/admin_stages.php?t=${timestamp}`);
 
-    axios.get(`http://localhost/lorem%20ipsum/api/admin_stages.php?t=${timestamp}`)
+    axios.get(`http://localhost/lorem-ipsum/api/admin_stages.php?t=${timestamp}`)
         .then(res => {
             const stages = res.data;
             overviewSection.style.display = "block";
@@ -95,7 +126,6 @@ function loadStagesFromAPI() {
             console.log('🧹 Cleared existing content');
 
             if (stages && stages.length > 0) {
-                console.log('✅ Found stages, updating process modules and cards...');
 
                 overviewSection.style.display = "block";
 
@@ -111,9 +141,9 @@ function loadStagesFromAPI() {
                     const card = document.createElement('div');
                     card.className = 'card';
                     card.innerHTML = `
-        <h4>${stage.name}</h4>
+        <h4>${stage.name.toUpperCase()}</h4>
             <p>${stage.description || ''}</p>
-        <div class="tag" style="background:${stageColor}">${stage.name}</div>
+        <div class="tag" style="background:${stageColor}">${stage.name.toUpperCase()}</div>
       `;
 
                     card.onclick = () => {
@@ -131,7 +161,7 @@ function loadStagesFromAPI() {
                     colorIndicator.style.background = stageColor;
 
                     btn.appendChild(colorIndicator);
-                    btn.appendChild(document.createTextNode(stage.name));
+                    btn.appendChild(document.createTextNode(stage.name.toUpperCase()));
 
                     btn.onclick = () => {
                         overviewSection.style.display = "none";
@@ -142,7 +172,6 @@ function loadStagesFromAPI() {
                     sidebarStages.appendChild(btn);
                 });
 
-                console.log('✅ All stage cards created successfully');
             } else {
                 console.log('⚠️ No stages found, showing message');
                 overviewSection.style.display = "block";
@@ -216,7 +245,6 @@ function updateProcessModules(stages) {
         legendContainer.appendChild(swatch);
     });
 
-    console.log(`✅ Process modules updated: ${stages.length} stages`);
 }
 
 setInterval(() => {
@@ -264,7 +292,6 @@ window.forceRefresh = function () {
 
     loadStagesFromAPI();
 
-    console.log('🔄 Force refresh completed');
 };
 
 
@@ -312,7 +339,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 function loadStage(stageId) {
-    axios.get('http://localhost/lorem%20ipsum/api/admin_stages.php')
+    axios.get('http://localhost/lorem-ipsum/api/admin_stages.php')
         .then(res => {
             const stages = res.data;
             const stage = stages.find(s => s.stage_id == stageId);
@@ -327,7 +354,7 @@ function loadStage(stageId) {
             }
         });
 
-    axios.get('http://localhost/lorem%20ipsum/api/admin_methods.php?stage_id=' + stageId)
+    axios.get('http://localhost/lorem-ipsum/api/admin_methods.php?stage_id=' + stageId)
         .then(res => {
             const methods = res.data;
             methodsContainer.innerHTML = "";
@@ -359,7 +386,7 @@ backBtn.onclick = () => {
 function openMethodBooklet(methodId) {
     window.currentMethodId = methodId;
 
-    axios.get('http://localhost/lorem%20ipsum/api/admin_methods.php?method_id=' + methodId)
+    axios.get('http://localhost/lorem-ipsum/api/admin_methods.php?method_id=' + methodId)
         .then(res => {
             const m = res.data;
             methodTitleEl.textContent = m.title || 'Untitled Method';
@@ -383,7 +410,6 @@ function openMethodBooklet(methodId) {
                 };
 
                 methodImage.onload = function () {
-                    console.log('✅ Image loaded successfully');
                 };
             } else {
                 console.log('🖼️ No image data, hiding container');
@@ -407,6 +433,10 @@ function openMethodBooklet(methodId) {
             loadAndRenderSections(methodId);
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
+
+            // Initialize page elements for animation
+            window.page1 = document.getElementById('page-1');
+            window.page2 = document.getElementById('page-2');
 
             if (window.innerWidth <= 768) {
                 preventAutoReset = false;
@@ -480,7 +510,7 @@ function clearFooterModeButtons() {
 
 function loadAndRenderSections(methodId) {
     methodSectionsEl.innerHTML = '';
-    axios.get('http://localhost/lorem%20ipsum/api/admin_sections.php?method_id=' + methodId)
+    axios.get('http://localhost/lorem-ipsum/api/admin_sections.php?method_id=' + methodId)
         .then(res => {
             const sections = Array.isArray(res.data) ? res.data : [];
             hasSections = sections.length > 0;
@@ -565,7 +595,7 @@ let allStages = []; // Store all stages for search
 
 async function loadAllMethodsForSearch() {
     try {
-        const response = await axios.get('http://localhost/lorem%20ipsum/api/admin_methods.php');
+        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_methods.php');
         const methods = response.data || [];
 
         const uniqueMethods = [];
@@ -716,7 +746,7 @@ async function displaySearchResults(results) {
               <div class="search-result-item stage-result" onclick="openStageFromSearch('${stage.name}')">
                 <div class="result-icon">🎯</div>
                 <div class="result-content">
-                  <div class="result-title">${stage.name}</div>
+                  <div class="result-title">${stage.name.toUpperCase()}</div>
                   <div class="result-description">${stage.description || 'No description'}</div>
                   <div class="result-meta">
                     <div class="result-labels">
@@ -814,7 +844,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadAllMethodsForSearch();
 
-    console.log('🔄 Search data loaded and ready');
 
 
 });
@@ -854,7 +883,7 @@ function getCleanMatchedFields(fields) {
 
 async function getMethodModes(methodId) {
     try {
-        const response = await axios.get(`http://localhost/lorem%20ipsum/api/admin_methods.php?method_id=${methodId}`);
+        const response = await axios.get(`http://localhost/lorem-ipsum/api/admin_methods.php?method_id=${methodId}`);
         const method = response.data;
 
         if (method && method.modes && Array.isArray(method.modes)) {
@@ -870,7 +899,7 @@ async function getMethodModes(methodId) {
 
 async function searchSections(searchTerm, results) {
     try {
-        const response = await axios.get('http://localhost/lorem%20ipsum/api/admin_sections.php');
+        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_sections.php');
         const sections = response.data || [];
 
         sections.forEach(section => {
@@ -964,13 +993,8 @@ function initBookletPages() {
         const pageNumberEl = document.getElementById('page-number');
 
         if (isMobile()) {
-            if (pageNumber === 1) {
-                page1.style.display = 'block';
-                page2.style.display = 'none';
-            } else if (pageNumber === 2) {
-                page1.style.display = 'none';
-                page2.style.display = 'block';
-            }
+            // Animated page flip for mobile
+            animatePageFlip(pageNumber);
             currentPage = pageNumber;
 
             if (pageNumberEl) {
@@ -978,8 +1002,8 @@ function initBookletPages() {
             }
         } else {
             const pagesContainer = document.querySelector('.booklet .pages');
-            page1.style.display = 'block';
-            page2.style.display = 'block';
+            window.page1.style.display = 'block';
+            window.page2.style.display = 'block';
             if (hasSections) {
                 if (pagesContainer) {
                     pagesContainer.classList.remove('single-page');
@@ -992,13 +1016,82 @@ function initBookletPages() {
         }
     }
 
+    function animatePageFlip(targetPage) {
+
+        const currentPageEl = targetPage === 1 ? window.page2 : window.page1;
+        const nextPageEl = targetPage === 1 ? window.page1 : window.page2;
+
+        if (!currentPageEl || !nextPageEl) {
+            console.error('❌ Page elements not found for animation');
+            return;
+        }
+
+
+        // Reset any existing animation classes and styles
+        window.page1.classList.remove('flip-out', 'flip-in', 'active');
+        window.page2.classList.remove('flip-out', 'flip-in', 'active');
+
+        // Reset inline styles
+        window.page1.style.transform = '';
+        window.page1.style.opacity = '';
+        window.page2.style.transform = '';
+        window.page2.style.opacity = '';
+
+        // Show both pages initially
+        window.page1.style.display = 'block';
+        window.page2.style.display = 'block';
+
+        // Force a reflow to ensure styles are applied
+        window.page1.offsetHeight;
+        window.page2.offsetHeight;
+
+        // Start the animation with both CSS classes and inline styles
+        currentPageEl.classList.add('flip-out');
+        currentPageEl.style.transform = 'rotateY(-90deg) scale(0.95)';
+        currentPageEl.style.opacity = '0';
+
+        nextPageEl.classList.add('flip-in');
+        nextPageEl.style.transform = 'rotateY(90deg) scale(0.95)';
+        nextPageEl.style.opacity = '0';
+
+        // Add a simple test animation as fallback
+        currentPageEl.style.animation = 'flipOut 0.6s ease-in-out forwards';
+        nextPageEl.style.animation = 'flipIn 0.6s ease-in-out forwards';
+
+        // After the flip-out animation completes, show the new page
+        setTimeout(() => {
+            currentPageEl.style.display = 'none';
+            nextPageEl.classList.remove('flip-in');
+            nextPageEl.classList.add('active');
+            nextPageEl.style.transform = 'rotateY(0deg) scale(1)';
+            nextPageEl.style.opacity = '1';
+        }, 300); // Half of the 600ms transition duration
+
+        // Clean up after animation completes
+        setTimeout(() => {
+            nextPageEl.classList.remove('active');
+            nextPageEl.style.transform = '';
+            nextPageEl.style.opacity = '';
+            nextPageEl.style.animation = '';
+            currentPageEl.style.animation = '';
+        }, 600);
+    }
+
 
     function flipPage() {
         if (isMobile()) {
             preventAutoReset = true;
+
+            // Add haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(50); // Short vibration
+            }
+
+
             if (currentPage === 1) {
                 if (hasSections) {
                     showPage(2);
+                } else {
                 }
             } else {
                 showPage(1);
@@ -1076,6 +1169,10 @@ function resetBookletToPage1() {
     const page1 = document.getElementById('page-1');
     const page2 = document.getElementById('page-2');
     const pageNumberEl = document.getElementById('page-number');
+
+    // Make page elements globally available for animation
+    window.page1 = page1;
+    window.page2 = page2;
     if (page1 && page2) {
         if (window.innerWidth <= 768) {
             page1.style.display = 'block';

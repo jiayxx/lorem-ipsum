@@ -32,6 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
 include './db.php';
 
+if (!$conn) {
+    http_response_code(500);
+    echo json_encode(["error" => "Database connection failed"]);
+    exit;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
@@ -42,6 +48,11 @@ if ($method === 'GET') {
   } else {
     $rows = [];
     $res = $conn->query("SELECT * FROM stages ORDER BY position ASC, stage_id ASC");
+    if (!$res) {
+        http_response_code(500);
+        echo json_encode(["error" => "Database query failed: " . $conn->error]);
+        exit;
+    }
     while ($r = $res->fetch_assoc()) { $rows[] = $r; }
     echo json_encode($rows);
   }
@@ -56,7 +67,21 @@ if ($method === 'POST') {
   $color = $conn->real_escape_string($body['color_code'] ?? null);
   if ($name === '') { http_response_code(400); echo json_encode(["error"=>"name required"]); exit; }
   $sql = "INSERT INTO stages (name, description, color_code) VALUES ('$name', '$description', " . ($color ? "'$color'" : "NULL") . ")";
-  if ($conn->query($sql)) { echo json_encode(["stage_id"=>$conn->insert_id]); } else { http_response_code(500); echo json_encode(["error"=>$conn->error]); }
+  if ($conn->query($sql)) { 
+    $stageId = $conn->insert_id;
+    
+    // Also add the stage to the modes table
+    $modeName = strtoupper($name);
+    $modeColor = $color ?: '#3b82f6';
+    $modeDesc = $description ?: "Mode for $modeName stage";
+    $modeSql = "INSERT INTO modes (name, color_code, description) VALUES ('$modeName', '$modeColor', '$modeDesc')";
+    $conn->query($modeSql);
+    
+    echo json_encode(["stage_id"=>$stageId]); 
+  } else { 
+    http_response_code(500); 
+    echo json_encode(["error"=>$conn->error]); 
+  }
   exit;
 }
 
@@ -70,7 +95,30 @@ if ($method === 'PUT') {
   $parts = array_values(array_filter([$name,$desc,$color,$position], fn($v)=>$v!==null));
   if (!$parts) { echo json_encode(["updated"=>0]); exit; }
   $sql = "UPDATE stages SET ".implode(',', $parts)." WHERE stage_id=$id";
-  if ($conn->query($sql)) { echo json_encode(["updated"=>$conn->affected_rows]); } else { http_response_code(500); echo json_encode(["error"=>$conn->error]); }
+  if ($conn->query($sql)) { 
+    // Also update the corresponding mode
+    if ($name || $desc || $color !== null) {
+      // Get the current stage name to find the corresponding mode
+      $stageResult = $conn->query("SELECT name FROM stages WHERE stage_id=$id");
+      if ($stageResult && $stageResult->num_rows > 0) {
+        $stage = $stageResult->fetch_assoc();
+        $modeName = strtoupper($stage['name']);
+        
+        $modeParts = [];
+        if ($desc) $modeParts[] = "description='".$conn->real_escape_string($body['description'])."'";
+        if ($color !== null) $modeParts[] = "color_code=".(is_null($body['color_code'])?"NULL":"'".$conn->real_escape_string($body['color_code'])."'");
+        
+        if ($modeParts) {
+          $modeSql = "UPDATE modes SET ".implode(',', $modeParts)." WHERE name='$modeName'";
+          $conn->query($modeSql);
+        }
+      }
+    }
+    echo json_encode(["updated"=>$conn->affected_rows]); 
+  } else { 
+    http_response_code(500); 
+    echo json_encode(["error"=>$conn->error]); 
+  }
   exit;
 }
 

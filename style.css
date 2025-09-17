@@ -31,6 +31,16 @@ The booklet styles start around line 800 with "Method Modes in Booklet" section.
     --muted: #6b7280;
     --surface: #fff;
     --border: #e5e7eb;
+    --stage-color-1: #06b6d4;
+    /* EMPATHIZE */
+    --stage-color-2: #10b981;
+    /* DEFINE */
+    --stage-color-3: #f59e0b;
+    /* IDEATE */
+    --stage-color-4: #ef4444;
+    /* PROTOTYPE */
+    --stage-color-5: #7f1d1d;
+    /* TEST */
 }
 
 /* Base */
@@ -454,7 +464,7 @@ h2 {
     left: 0;
     right: 0;
     top: 0;
-    background: linear-gradient(90deg, var(--accent), #8b5cf6, #06b6d4);
+    background: linear-gradient(90deg, var(--accent), var(--stage-color-4), var(--stage-color-1));
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -779,7 +789,7 @@ h2 {
     left: 0;
     width: 4px;
     height: 100%;
-    background: linear-gradient(180deg, var(--accent), #8b5cf6);
+    background: linear-gradient(180deg, var(--accent), var(--stage-color-4));
     border-radius: 0 2px 2px 0;
 }
 
@@ -1002,7 +1012,7 @@ h2 {
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4, #10b981, #f59e0b);
+    background: linear-gradient(90deg, var(--stage-color-1), var(--stage-color-4), var(--stage-color-2), var(--stage-color-3), var(--stage-color-5));
     border-radius: 24px 24px 0 0;
 }
 
@@ -1936,6 +1946,102 @@ h2 {
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         position: relative;
         overflow-y: auto;
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-origin: center;
+        transform-style: preserve-3d;
+    }
+
+    /* Page flip animation states */
+    .booklet .page.flip-out {
+        transform: rotateY(-90deg) scale(0.95) !important;
+        opacity: 0 !important;
+    }
+
+    .booklet .page.flip-in {
+        transform: rotateY(90deg) scale(0.95) !important;
+        opacity: 0 !important;
+    }
+
+    .booklet .page.flip-in.active {
+        transform: rotateY(0deg) scale(1) !important;
+        opacity: 1 !important;
+    }
+
+    /* Add perspective to the booklet container for 3D effect */
+    .booklet .pages {
+        perspective: 1000px;
+        transform-style: preserve-3d;
+    }
+
+    /* Mobile booklet tap hint animation */
+    @media (max-width: 768px) {
+        .booklet {
+            cursor: pointer;
+            position: relative;
+        }
+
+        .booklet::before {
+            content: '👆 Tap to flip page';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .booklet:hover::before,
+        .booklet:active::before {
+            opacity: 1;
+        }
+
+        /* Subtle pulse animation to indicate interactivity */
+        .booklet .page {
+            animation: subtlePulse 3s ease-in-out infinite;
+        }
+
+        @keyframes subtlePulse {
+
+            0%,
+            100% {
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            50% {
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            }
+        }
+
+        /* Keyframe animations for page flip */
+        @keyframes flipOut {
+            0% {
+                transform: rotateY(0deg) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: rotateY(-90deg) scale(0.95);
+                opacity: 0;
+            }
+        }
+
+        @keyframes flipIn {
+            0% {
+                transform: rotateY(90deg) scale(0.95);
+                opacity: 0;
+            }
+
+            100% {
+                transform: rotateY(0deg) scale(1);
+                opacity: 1;
+            }
+        }
     }
 
     .booklet .page:first-child {

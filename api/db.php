@@ -39,7 +39,9 @@ if ($result->num_rows == 0) {
     }
 }
 
-$conn->select_db($dbname);
+if (!$conn->select_db($dbname)) {
+    die("Error selecting database: " . $conn->error);
+}
 
 $tables = ['stages', 'methods', 'method_sections', 'method_stage', 'method_modes', 'modes'];
 foreach ($tables as $table) {
@@ -57,6 +59,7 @@ function createTable($conn, $tableName) {
                 name VARCHAR(255) NOT NULL,
                 description TEXT,
                 color_code VARCHAR(7),
+                position INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )";
             break;
@@ -65,10 +68,11 @@ function createTable($conn, $tableName) {
             $sql = "CREATE TABLE methods (
                 method_id INT AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
-
                 short_desc TEXT,
                 long_desc TEXT,
                 resources TEXT,
+                image_url TEXT,
+                position INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )";
             break;

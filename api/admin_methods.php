@@ -82,14 +82,21 @@ if ($method === 'POST') {
   $short = $conn->real_escape_string($body['short_desc'] ?? '');
   $long = $conn->real_escape_string($body['long_desc'] ?? '');
   $resources = $conn->real_escape_string($body['resources'] ?? '');
-  $imageUrl = $conn->real_escape_string($body['image_url'] ?? '');
+  $rawImageUrl = $body['image_url'] ?? '';
+  
+  $imageUrl = $conn->real_escape_string($rawImageUrl);
+  
+  // Debug logging for image issues
+  
   $sql = "INSERT INTO methods (title, short_desc, long_desc, resources, image_url) VALUES ('$title','$short','$long','$resources','$imageUrl')";
   if (!$conn->query($sql)) { http_response_code(500); echo json_encode(["error"=>$conn->error]); exit; }
   $methodId = $conn->insert_id;
   
   if (!empty($body['stage_id'])) {
     $stageId = intval($body['stage_id']);
-    $conn->query("INSERT INTO method_stage (method_id, stage_id) VALUES ($methodId, $stageId)");
+    $result = $conn->query("INSERT INTO method_stage (method_id, stage_id) VALUES ($methodId, $stageId)");
+    if (!$result) {
+    }
   }
   
   if (!empty($body['modes']) && is_array($body['modes'])) {
@@ -109,6 +116,9 @@ if ($method === 'PUT') {
   $parts = [];
   foreach (["title","short_desc","long_desc","resources","image_url","position"] as $col) {
     if (array_key_exists($col, $body)) {
+      if ($col === 'image_url') {
+        // Debug logging for image updates
+      }
       $parts[] = $col."='".$conn->real_escape_string($body[$col])."'";
     }
   }
@@ -119,7 +129,11 @@ if ($method === 'PUT') {
   if (array_key_exists('stage_id', $body)) {
     $stageId = intval($body['stage_id']);
     $conn->query("DELETE FROM method_stage WHERE method_id=$id");
-    if ($stageId) $conn->query("INSERT INTO method_stage (method_id, stage_id) VALUES ($id, $stageId)");
+    if ($stageId) {
+      $result = $conn->query("INSERT INTO method_stage (method_id, stage_id) VALUES ($id, $stageId)");
+      if (!$result) {
+      }
+    }
   }
   
   if (array_key_exists('modes', $body)) {
