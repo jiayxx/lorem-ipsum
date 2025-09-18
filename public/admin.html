@@ -1,0 +1,158 @@
+ <!-- 
+==========================================
+DESIGN THINKING BOOKLET - ADMIN PANEL
+==========================================
+
+This is the administrative interface for managing the Design Thinking Booklet content.
+Teachers and administrators use this to create, edit, and organize the booklet content.
+
+KEY ADMIN FEATURES:
+- Stage Management: Create and edit design thinking stages (Empathize, Define, etc.)
+- Method Management: Add, edit, and organize methods within stages
+- Section Management: Create detailed sections for each method
+- Image Upload: Add images to methods for visual learning
+- Drag & Drop: Reorder methods within stages
+- Color Management: Set colors for each stage/mode
+- Undo Functionality: 24-hour undo for deleted stages
+
+TEACHER NOTE: This is the content management system for the booklet.
+All content created here appears in the main application (main.html).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin – DT Booklet</title>
+  <link rel="stylesheet" href="style.css" />
+
+
+<link rel="stylesheet" href="admin.css">
+
+
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="admin.js"></script>
+
+  
+</head>
+<body>
+  <div class="admin-grid">
+    <aside class="admin-sidebar">
+      <h3>Stages <span class="drag-hint">(Drag to reorder)</span></h3>
+      <div id="stage-list" class="list stack" id="stages-draggable"></div>
+      
+      <div class="undo-section" style="margin: 0.75rem 0;">
+        <button class="btn restore" onclick="undoDeletedStages()" id="undo-stages-btn" style="display: none;">
+          <span class="undo-icon">↶</span>
+          Undo Deleted Stages
+        </button>
+      </div>
+      
+      <div class="panel" style="margin-top:.75rem;">
+        <div class="stack">
+          <input id="stage-id" type="hidden" />
+          <label>Name<input id="stage-name" /></label>
+          <label>Description<textarea id="stage-desc" rows="3"></textarea></label>
+          
+          <div class="mode-colors">
+            <div class="title">Mode Colors (Customizable):</div>
+            <div id="mode-color-list">
+              <div style="padding: 1rem; text-align: center; color: #6b7280;">
+                Loading mode colors...<br>
+                <small>If this doesn't change, click the test button below</small>
+          </div>
+            </div>
+
+          </div>
+          
+
+          <div class="actions">
+            <button class="btn" onclick="newStage()">New</button>
+            <button class="btn primary" onclick="saveStage()">Save</button>
+            <button class="btn" onclick="deleteStage()">Delete</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <main class="admin-content">
+      <div class="stage-context" id="stage-context">Current Stage: None</div>
+      
+      <h2>Methods</h2>
+      <div class="row" style="align-items:flex-start; gap:1rem;">
+        <div style="flex:1;">
+          <div id="method-list" class="list stack"></div>
+        </div>
+        <div class="panel" style="flex:2;">
+          <h3>Edit Method</h3>
+          <div class="method-context" id="method-context">Current Method: None</div>
+          <div class="stack">
+            <input id="method-id" type="hidden" />
+            <label>Method Title<input id="method-title" placeholder="Enter method title" /></label>
+    
+            <label>Short Description<textarea id="method-short" rows="2"></textarea></label>
+            <label>Long Description (Optional)<textarea id="method-long" rows="6" placeholder="Leave empty if no detailed description needed"></textarea></label>
+            <label>Method Image (Optional)
+              <div class="image-upload-area">
+                <input id="method-image" type="file" accept="image/*" class="file-input" />
+                <div class="upload-placeholder">
+                  <div class="upload-icon">📷</div>
+                  <div class="upload-text">Click to select an image</div>
+                  <div class="upload-hint">PNG, JPG up to 5MB</div>
+                </div>
+              </div>
+            </label>
+            <div id="current-image-preview" class="image-preview-area">
+              <div class="preview-container">
+                <img id="image-preview" class="preview-image" />
+                <div class="preview-overlay">
+                  <button type="button" onclick="removeImage()" class="remove-btn">Remove</button>
+                </div>
+              </div>
+            </div>
+            <label>Resources<textarea id="method-resources" rows="2"></textarea></label>
+            
+            <div class="mode-selection">
+              <label class="mode-label">Select Modes/Modules:</label>
+              <div class="mode-checkboxes" id="dynamic-mode-checkboxes">
+              </div>
+            </div>
+            
+            <div class="actions">
+              <button class="btn" onclick="newMethod()">New</button>
+              <button class="btn primary" onclick="saveMethod()">Save</button>
+              <button class="btn" onclick="deleteMethod()">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h2 style="margin-top:1rem;">Sections</h2>
+      <div class="row" style="align-items:flex-start; gap:1rem;">
+        <div style="flex:1;">
+          <div id="section-list" class="list stack"></div>
+        </div>
+        <div class="panel" style="flex:2;">
+          <h3>Edit Section</h3>
+          <div class="method-context" id="current-method-name">None selected</div>
+          <div class="stack">
+            <input id="section-id" type="hidden" />
+            <label>Title (Optional)<input id="section-title" placeholder="Leave empty if no title needed" /></label>
+            <label>Description<textarea id="section-desc" rows="4"></textarea></label>
+            <label>Parent Section ID<input id="section-parent" placeholder="Leave empty for top-level section" /></label>
+            
+            <div class="actions">
+              <button class="btn" onclick="newSection()">New</button>
+              <button class="btn primary" onclick="saveSection()">Save</button>
+              <button class="btn" onclick="deleteSection()">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -79,7 +79,7 @@ function updateCSSVariables(stages) {
 
 async function loadModeColors() {
     try {
-        const response = await axios.get('api/admin_stages.php');
+        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_stages.php');
         const stages = response.data;
 
         Object.keys(MODE_COLORS).forEach(key => delete MODE_COLORS[key]);
@@ -109,18 +109,21 @@ function loadStagesFromAPI() {
     const timestamp = new Date().getTime();
 
     console.log('🔍 Fetching fresh stages data...');
+    console.log('🔗 API URL:', `http://localhost/lorem-ipsum/api/admin_stages.php?t=${timestamp}`);
 
-    axios.get(`api/admin_stages.php?t=${timestamp}`)
+    axios.get(`http://localhost/lorem-ipsum/api/admin_stages.php?t=${timestamp}`)
         .then(res => {
             const stages = res.data;
             overviewSection.style.display = "block";
 
-            // Debug logs trimmed in production
+            console.log('📊 Raw API response:', res);
+            console.log('📋 Stages data:', stages);
+            console.log('🔢 Number of stages:', stages ? stages.length : 0);
 
             stagesContainer.innerHTML = '';
             sidebarStages.innerHTML = '';
 
-
+            console.log('🧹 Cleared existing content');
 
             if (stages && stages.length > 0) {
 
@@ -133,7 +136,7 @@ function loadStagesFromAPI() {
                 updateSearchData(stages);
 
                 stages.forEach((stage, index) => {
-
+                    console.log(`🎯 Creating card ${index + 1}:`, stage.name);
                     const stageColor = getStageColorByName(stage.name, stage.color_code);
                     const card = document.createElement('div');
                     card.className = 'card';
@@ -178,7 +181,10 @@ function loadStagesFromAPI() {
             }
         })
         .catch(err => {
-            console.error('❌ Error loading stages from admin API:', err?.message || err);
+            console.error('❌ Error loading stages from admin API:', err);
+            console.error('❌ Error details:', err.response ? err.response.data : 'No response data');
+            console.error('❌ Error status:', err.response ? err.response.status : 'No status');
+            console.error('❌ Full error object:', err);
 
             overviewSection.style.display = "block";
             stagesContainer.innerHTML = '<p>Error loading stages</p>';
@@ -333,7 +339,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 function loadStage(stageId) {
-    axios.get('api/admin_stages.php')
+    axios.get('http://localhost/lorem-ipsum/api/admin_stages.php')
         .then(res => {
             const stages = res.data;
             const stage = stages.find(s => s.stage_id == stageId);
@@ -348,7 +354,7 @@ function loadStage(stageId) {
             }
         });
 
-    axios.get('api/admin_methods.php?stage_id=' + stageId)
+    axios.get('http://localhost/lorem-ipsum/api/admin_methods.php?stage_id=' + stageId)
         .then(res => {
             const methods = res.data;
             methodsContainer.innerHTML = "";
@@ -380,7 +386,7 @@ backBtn.onclick = () => {
 function openMethodBooklet(methodId) {
     window.currentMethodId = methodId;
 
-    axios.get('api/admin_methods.php?method_id=' + methodId)
+    axios.get('http://localhost/lorem-ipsum/api/admin_methods.php?method_id=' + methodId)
         .then(res => {
             const m = res.data;
             methodTitleEl.textContent = m.title || 'Untitled Method';
@@ -504,7 +510,7 @@ function clearFooterModeButtons() {
 
 function loadAndRenderSections(methodId) {
     methodSectionsEl.innerHTML = '';
-    axios.get('api/admin_sections.php?method_id=' + methodId)
+    axios.get('http://localhost/lorem-ipsum/api/admin_sections.php?method_id=' + methodId)
         .then(res => {
             const sections = Array.isArray(res.data) ? res.data : [];
             hasSections = sections.length > 0;
@@ -589,7 +595,7 @@ let allStages = []; // Store all stages for search
 
 async function loadAllMethodsForSearch() {
     try {
-        const response = await axios.get('api/admin_methods.php');
+        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_methods.php');
         const methods = response.data || [];
 
         const uniqueMethods = [];
@@ -877,7 +883,7 @@ function getCleanMatchedFields(fields) {
 
 async function getMethodModes(methodId) {
     try {
-        const response = await axios.get(`api/admin_methods.php?method_id=${methodId}`);
+        const response = await axios.get(`http://localhost/lorem-ipsum/api/admin_methods.php?method_id=${methodId}`);
         const method = response.data;
 
         if (method && method.modes && Array.isArray(method.modes)) {
@@ -893,7 +899,7 @@ async function getMethodModes(methodId) {
 
 async function searchSections(searchTerm, results) {
     try {
-        const response = await axios.get('api/admin_sections.php');
+        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_sections.php');
         const sections = response.data || [];
 
         sections.forEach(section => {
