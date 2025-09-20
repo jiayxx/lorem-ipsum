@@ -45,6 +45,9 @@ const methodSectionsEl = document.getElementById('method-sections'); // BOOKLET 
 // Mode Colors Storage (loaded from database)
 const MODE_COLORS = {};
 
+// Prevent multiple simultaneous updates
+let isUpdatingProcessModules = false;
+
 function getModeColor(modeName) {
     return MODE_COLORS[modeName] || '#6b7280';
 }
@@ -77,11 +80,8 @@ function updateCSSVariables(stages) {
     }
 }
 
-async function loadModeColors() {
+function loadModeColors(stages) {
     try {
-        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_stages.php');
-        const stages = response.data;
-
         Object.keys(MODE_COLORS).forEach(key => delete MODE_COLORS[key]);
 
         stages.forEach(stage => {
@@ -90,8 +90,6 @@ async function loadModeColors() {
 
         // Update CSS variables for dynamic colors
         updateCSSVariables(stages);
-
-
 
     } catch (error) {
         console.error('❌ Error loading mode colors:', error);
@@ -108,22 +106,17 @@ function getStageColorByName(name, fallback) {
 function loadStagesFromAPI() {
     const timestamp = new Date().getTime();
 
-    console.log('🔍 Fetching fresh stages data...');
-    console.log('🔗 API URL:', `http://localhost/lorem-ipsum/api/admin_stages.php?t=${timestamp}`);
-
-    axios.get(`http://localhost/lorem-ipsum/api/admin_stages.php?t=${timestamp}`)
+    axios.get(`api/admin_stages.php?t=${timestamp}`)
         .then(res => {
             const stages = res.data;
             overviewSection.style.display = "block";
 
-            console.log('📊 Raw API response:', res);
-            console.log('📋 Stages data:', stages);
-            console.log('🔢 Number of stages:', stages ? stages.length : 0);
+            // Debug logs trimmed in production
 
             stagesContainer.innerHTML = '';
             sidebarStages.innerHTML = '';
 
-            console.log('🧹 Cleared existing content');
+
 
             if (stages && stages.length > 0) {
 
@@ -135,8 +128,11 @@ function loadStagesFromAPI() {
 
                 updateSearchData(stages);
 
+                // Load mode colors using the same stages data
+                loadModeColors(stages);
+
                 stages.forEach((stage, index) => {
-                    console.log(`🎯 Creating card ${index + 1}:`, stage.name);
+
                     const stageColor = getStageColorByName(stage.name, stage.color_code);
                     const card = document.createElement('div');
                     card.className = 'card';
@@ -181,10 +177,7 @@ function loadStagesFromAPI() {
             }
         })
         .catch(err => {
-            console.error('❌ Error loading stages from admin API:', err);
-            console.error('❌ Error details:', err.response ? err.response.data : 'No response data');
-            console.error('❌ Error status:', err.response ? err.response.status : 'No status');
-            console.error('❌ Full error object:', err);
+            console.error('❌ Error loading stages from admin API:', err?.message || err);
 
             overviewSection.style.display = "block";
             stagesContainer.innerHTML = '<p>Error loading stages</p>';
@@ -194,22 +187,35 @@ function loadStagesFromAPI() {
 }
 
 loadStagesFromAPI();
-loadModeColors(); // Load mode colors from database
 
 
 
 
 function updateProcessModules(stages) {
+    if (isUpdatingProcessModules) {
+        return;
+    }
+
+    isUpdatingProcessModules = true;
     const chipsContainer = document.getElementById('process-modules-chips');
     const legendContainer = document.getElementById('process-modules-legend');
 
-    if (!chipsContainer || !legendContainer) return;
+    if (!chipsContainer || !legendContainer) {
+        isUpdatingProcessModules = false;
+        return;
+    }
 
-    chipsContainer.innerHTML = '';
-    legendContainer.innerHTML = '';
+    // Force clear existing content completely
+    while (chipsContainer.firstChild) {
+        chipsContainer.removeChild(chipsContainer.firstChild);
+    }
+    while (legendContainer.firstChild) {
+        legendContainer.removeChild(legendContainer.firstChild);
+    }
 
     if (!stages || stages.length === 0) {
         chipsContainer.innerHTML = '<p class="no-modules">No process modules available</p>';
+        isUpdatingProcessModules = false;
         return;
     }
 
@@ -245,6 +251,7 @@ function updateProcessModules(stages) {
         legendContainer.appendChild(swatch);
     });
 
+    isUpdatingProcessModules = false;
 }
 
 setInterval(() => {
@@ -339,7 +346,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 function loadStage(stageId) {
-    axios.get('http://localhost/lorem-ipsum/api/admin_stages.php')
+    axios.get('api/admin_stages.php')
         .then(res => {
             const stages = res.data;
             const stage = stages.find(s => s.stage_id == stageId);
@@ -354,7 +361,7 @@ function loadStage(stageId) {
             }
         });
 
-    axios.get('http://localhost/lorem-ipsum/api/admin_methods.php?stage_id=' + stageId)
+    axios.get('api/admin_methods.php?stage_id=' + stageId)
         .then(res => {
             const methods = res.data;
             methodsContainer.innerHTML = "";
@@ -386,7 +393,7 @@ backBtn.onclick = () => {
 function openMethodBooklet(methodId) {
     window.currentMethodId = methodId;
 
-    axios.get('http://localhost/lorem-ipsum/api/admin_methods.php?method_id=' + methodId)
+    axios.get('api/admin_methods.php?method_id=' + methodId)
         .then(res => {
             const m = res.data;
             methodTitleEl.textContent = m.title || 'Untitled Method';
@@ -493,7 +500,10 @@ function updateFooterModeButtons(modes, modeColors) {
     const footerButtons = document.getElementById('footer-mode-buttons');
     footerButtons.innerHTML = '';
 
-    modes.forEach(mode => {
+    // Remove duplicates from modes array
+    const uniqueModes = [...new Set(modes)];
+
+    uniqueModes.forEach(mode => {
         const color = getModeColor(mode);
         const button = document.createElement('button');
         button.className = 'mode-btn';
@@ -510,7 +520,7 @@ function clearFooterModeButtons() {
 
 function loadAndRenderSections(methodId) {
     methodSectionsEl.innerHTML = '';
-    axios.get('http://localhost/lorem-ipsum/api/admin_sections.php?method_id=' + methodId)
+    axios.get('api/admin_sections.php?method_id=' + methodId)
         .then(res => {
             const sections = Array.isArray(res.data) ? res.data : [];
             hasSections = sections.length > 0;
@@ -595,7 +605,7 @@ let allStages = []; // Store all stages for search
 
 async function loadAllMethodsForSearch() {
     try {
-        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_methods.php');
+        const response = await axios.get('api/admin_methods.php');
         const methods = response.data || [];
 
         const uniqueMethods = [];
@@ -883,7 +893,7 @@ function getCleanMatchedFields(fields) {
 
 async function getMethodModes(methodId) {
     try {
-        const response = await axios.get(`http://localhost/lorem-ipsum/api/admin_methods.php?method_id=${methodId}`);
+        const response = await axios.get(`api/admin_methods.php?method_id=${methodId}`);
         const method = response.data;
 
         if (method && method.modes && Array.isArray(method.modes)) {
@@ -899,7 +909,7 @@ async function getMethodModes(methodId) {
 
 async function searchSections(searchTerm, results) {
     try {
-        const response = await axios.get('http://localhost/lorem-ipsum/api/admin_sections.php');
+        const response = await axios.get('api/admin_sections.php');
         const sections = response.data || [];
 
         sections.forEach(section => {
@@ -1002,8 +1012,8 @@ function initBookletPages() {
             }
         } else {
             const pagesContainer = document.querySelector('.booklet .pages');
-            window.page1.style.display = 'block';
-            window.page2.style.display = 'block';
+            if (window.page1) window.page1.style.display = 'block';
+            if (window.page2) window.page2.style.display = 'block';
             if (hasSections) {
                 if (pagesContainer) {
                     pagesContainer.classList.remove('single-page');
@@ -1021,7 +1031,7 @@ function initBookletPages() {
         const currentPageEl = targetPage === 1 ? window.page2 : window.page1;
         const nextPageEl = targetPage === 1 ? window.page1 : window.page2;
 
-        if (!currentPageEl || !nextPageEl) {
+        if (!currentPageEl || !nextPageEl || !window.page1 || !window.page2) {
             console.error('❌ Page elements not found for animation');
             return;
         }
@@ -1038,12 +1048,12 @@ function initBookletPages() {
         window.page2.style.opacity = '';
 
         // Show both pages initially
-        window.page1.style.display = 'block';
-        window.page2.style.display = 'block';
+        if (window.page1) window.page1.style.display = 'block';
+        if (window.page2) window.page2.style.display = 'block';
 
         // Force a reflow to ensure styles are applied
-        window.page1.offsetHeight;
-        window.page2.offsetHeight;
+        if (window.page1) window.page1.offsetHeight;
+        if (window.page2) window.page2.offsetHeight;
 
         // Start the animation with both CSS classes and inline styles
         currentPageEl.classList.add('flip-out');

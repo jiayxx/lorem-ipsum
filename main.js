@@ -45,6 +45,9 @@ const methodSectionsEl = document.getElementById('method-sections'); // BOOKLET 
 // Mode Colors Storage (loaded from database)
 const MODE_COLORS = {};
 
+// Prevent multiple simultaneous updates
+let isUpdatingProcessModules = false;
+
 function getModeColor(modeName) {
     return MODE_COLORS[modeName] || '#6b7280';
 }
@@ -77,11 +80,8 @@ function updateCSSVariables(stages) {
     }
 }
 
-async function loadModeColors() {
+function loadModeColors(stages) {
     try {
-        const response = await axios.get('api/admin_stages.php');
-        const stages = response.data;
-
         Object.keys(MODE_COLORS).forEach(key => delete MODE_COLORS[key]);
 
         stages.forEach(stage => {
@@ -90,8 +90,6 @@ async function loadModeColors() {
 
         // Update CSS variables for dynamic colors
         updateCSSVariables(stages);
-
-
 
     } catch (error) {
         console.error('❌ Error loading mode colors:', error);
@@ -107,8 +105,6 @@ function getStageColorByName(name, fallback) {
 
 function loadStagesFromAPI() {
     const timestamp = new Date().getTime();
-
-    console.log('🔍 Fetching fresh stages data...');
 
     axios.get(`api/admin_stages.php?t=${timestamp}`)
         .then(res => {
@@ -131,6 +127,9 @@ function loadStagesFromAPI() {
                 updateHeroContent(stages);
 
                 updateSearchData(stages);
+
+                // Load mode colors using the same stages data
+                loadModeColors(stages);
 
                 stages.forEach((stage, index) => {
 
@@ -188,22 +187,35 @@ function loadStagesFromAPI() {
 }
 
 loadStagesFromAPI();
-loadModeColors(); // Load mode colors from database
 
 
 
 
 function updateProcessModules(stages) {
+    if (isUpdatingProcessModules) {
+        return;
+    }
+
+    isUpdatingProcessModules = true;
     const chipsContainer = document.getElementById('process-modules-chips');
     const legendContainer = document.getElementById('process-modules-legend');
 
-    if (!chipsContainer || !legendContainer) return;
+    if (!chipsContainer || !legendContainer) {
+        isUpdatingProcessModules = false;
+        return;
+    }
 
-    chipsContainer.innerHTML = '';
-    legendContainer.innerHTML = '';
+    // Force clear existing content completely
+    while (chipsContainer.firstChild) {
+        chipsContainer.removeChild(chipsContainer.firstChild);
+    }
+    while (legendContainer.firstChild) {
+        legendContainer.removeChild(legendContainer.firstChild);
+    }
 
     if (!stages || stages.length === 0) {
         chipsContainer.innerHTML = '<p class="no-modules">No process modules available</p>';
+        isUpdatingProcessModules = false;
         return;
     }
 
@@ -239,6 +251,7 @@ function updateProcessModules(stages) {
         legendContainer.appendChild(swatch);
     });
 
+    isUpdatingProcessModules = false;
 }
 
 setInterval(() => {
@@ -487,7 +500,10 @@ function updateFooterModeButtons(modes, modeColors) {
     const footerButtons = document.getElementById('footer-mode-buttons');
     footerButtons.innerHTML = '';
 
-    modes.forEach(mode => {
+    // Remove duplicates from modes array
+    const uniqueModes = [...new Set(modes)];
+
+    uniqueModes.forEach(mode => {
         const color = getModeColor(mode);
         const button = document.createElement('button');
         button.className = 'mode-btn';
@@ -996,8 +1012,8 @@ function initBookletPages() {
             }
         } else {
             const pagesContainer = document.querySelector('.booklet .pages');
-            window.page1.style.display = 'block';
-            window.page2.style.display = 'block';
+            if (window.page1) window.page1.style.display = 'block';
+            if (window.page2) window.page2.style.display = 'block';
             if (hasSections) {
                 if (pagesContainer) {
                     pagesContainer.classList.remove('single-page');
@@ -1015,7 +1031,7 @@ function initBookletPages() {
         const currentPageEl = targetPage === 1 ? window.page2 : window.page1;
         const nextPageEl = targetPage === 1 ? window.page1 : window.page2;
 
-        if (!currentPageEl || !nextPageEl) {
+        if (!currentPageEl || !nextPageEl || !window.page1 || !window.page2) {
             console.error('❌ Page elements not found for animation');
             return;
         }
@@ -1032,12 +1048,12 @@ function initBookletPages() {
         window.page2.style.opacity = '';
 
         // Show both pages initially
-        window.page1.style.display = 'block';
-        window.page2.style.display = 'block';
+        if (window.page1) window.page1.style.display = 'block';
+        if (window.page2) window.page2.style.display = 'block';
 
         // Force a reflow to ensure styles are applied
-        window.page1.offsetHeight;
-        window.page2.offsetHeight;
+        if (window.page1) window.page1.offsetHeight;
+        if (window.page2) window.page2.offsetHeight;
 
         // Start the animation with both CSS classes and inline styles
         currentPageEl.classList.add('flip-out');

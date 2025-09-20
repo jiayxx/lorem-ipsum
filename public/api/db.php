@@ -22,7 +22,7 @@ All content is stored in these tables and accessed via the API files.
 $servername = "localhost";
 $username = "root";   // default in XAMPP
 $password = "";       // default is empty in XAMPP
-$dbname = "dtlearningsystem"; // your database name
+$dbname = "dtllearningsystem"; // your database name
 
 $conn = new mysqli($servername, $username, $password);
 
